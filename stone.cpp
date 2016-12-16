@@ -21,12 +21,10 @@ QString Stone::ChineseName()
     switch(_name)
     {
     case JU:
-    {
         if(_isred)
-            return "车";
+            return QString("车");
         else
-            return "車";
-    }
+            return QString("車");
     case MA:
         if(_isred)
             return QString("馬");

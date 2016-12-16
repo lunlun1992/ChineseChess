@@ -7,11 +7,9 @@ enum StoneName
     MA,
     PAO,
     BING,
-    ZU,
     SHI,
     XIANG,
-    JIANG,
-    SHUAI
+    JIANG
 };
 
 class Stone

@@ -3,6 +3,7 @@
 Board::Board(QWidget *parent) : QWidget(parent), dis(45)
 {
     _isreddown = true;
+    _selected_id = -1;
     initstones(_isreddown);
 }
 
@@ -46,7 +47,7 @@ void Board::paintEvent(QPaintEvent *)
     QPainter p(this);
 
     p.translate(QPoint(dis, dis));
-
+    p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
     p.save();
     paintlines(p);
     p.restore();
@@ -143,8 +144,22 @@ void Board::drawstone(QPainter &p, int id)
     else
         color = Qt::black;
     p.setPen(QPen(QBrush(color), 2));
-    p.setFont(QFont("system", dis * 1.2, 700));
-    p.drawText(QRect(QPoint(s._col * dis - dis / 2, s._row * dis - dis / 2), QSize(dis, dis)), s.ChineseName(), QTextOption(Qt::AlignCenter));
+    p.setFont(QFont("system", dis * 0.6, 700));
+    if(_selected_id == id)
+        p.setBrush(Qt::gray);
+    else
+        p.setBrush(Qt::yellow);
+    p.drawEllipse(cell(id));
+    p.drawText(cell(id), s.ChineseName(), QTextOption(Qt::AlignCenter));
 }
 
 
+QRect Board::cell(int id)
+{
+    return cell(stones[id]._row, stones[id]._col);
+}
+
+QRect Board::cell(int row, int col)
+{
+    return QRect(QPoint(col * dis - dis / 2, row * dis - dis / 2), QSize(dis, dis));
+}

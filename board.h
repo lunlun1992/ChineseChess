@@ -23,8 +23,12 @@ public:
     void drawstone(QPainter &p, int id);
     void initstones(bool isreddown);
 
+    QRect cell(int row, int col);
+    QRect cell(int id);
+
     int dis;
     bool _isreddown;
+    int _selected_id;
     Stone stones[32];
 signals:
 
