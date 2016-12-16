@@ -1,36 +1,33 @@
 #ifndef STONE_H
 #define STONE_H
-
-#include <QWidget>
-#include <QPainter>
-
+#include <QString>
 enum StoneName
 {
     JU,
     MA,
     PAO,
     BING,
+    ZU,
     SHI,
     XIANG,
     JIANG,
     SHUAI
 };
-class stone : public QWidget
+
+class Stone
 {
-    Q_OBJECT
 public:
-    explicit stone(QWidget *parent = 0);
-    void paintEvent(QPaintEvent *event);
-    void init();
+    Stone();
+    ~Stone();
+    void init(int r, int c, bool isred, StoneName n);
+    QString ChineseName();
 
-    int id;
-    StoneName name;
-    bool isred;
-    bool isdead;
-
-signals:
-
-public slots:
+    int _id;
+    StoneName _name;
+    bool _isred;
+    bool _isdead;
+    int _row;
+    int _col;
 };
 
 #endif // STONE_H
