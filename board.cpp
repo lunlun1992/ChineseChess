@@ -1,9 +1,10 @@
 #include "board.h"
 
-Board::Board(QWidget *parent) : QWidget(parent), dis(45)
+Board::Board(QWidget *parent) : QWidget(parent), dis(45), stonedis(0.8 * dis)
 {
     _isreddown = true;
     _selected_id = -1;
+    _isredturn = true;
     initstones(_isreddown);
 }
 
@@ -30,6 +31,18 @@ void Board::paintlines(QPainter &p)
     p.setFont(QFont("aaa", 25, 350, true));
     p.drawText(QPoint(dis * 1, dis * 4.75), "楚河");
     p.drawText(QPoint(dis * 5.3, dis * 4.75), "汉界");
+
+    if(_isredturn)
+    {
+        p.setPen(QPen(QBrush(Qt::red), 2));
+        p.drawText(QPoint(dis * 9, dis * 4), "Red Turn");
+    }
+    else
+    {
+        p.setPen(QPen(QBrush(Qt::black), 2));
+        p.drawText(QPoint(dis * 9, dis * 4), "Black Turn");
+    }
+
 }
 
 
@@ -47,7 +60,7 @@ void Board::paintEvent(QPaintEvent *)
     QPainter p(this);
 
     p.translate(QPoint(dis, dis));
-    p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
+    p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);//抗锯齿
     p.save();
     paintlines(p);
     p.restore();
@@ -144,7 +157,7 @@ void Board::drawstone(QPainter &p, int id)
     else
         color = Qt::black;
     p.setPen(QPen(QBrush(color), 2));
-    p.setFont(QFont("system", dis * 0.6, 700));
+    p.setFont(QFont("system", 0.8 * stonedis, 700));
     if(_selected_id == id)
         p.setBrush(Qt::gray);
     else
@@ -161,5 +174,407 @@ QRect Board::cell(int id)
 
 QRect Board::cell(int row, int col)
 {
-    return QRect(QPoint(col * dis - dis / 2, row * dis - dis / 2), QSize(dis, dis));
+    return QRect(QPoint(col * dis - stonedis / 2, row * dis - stonedis / 2), QSize(stonedis, stonedis));
+}
+
+QRect Board::cell(QPoint &p)
+{
+    int col = (p.x() + dis / 2) / dis;
+    int row = (p.y() + dis / 2) / dis;
+    return cell(row, col);
+}
+
+void Board::mouseReleaseEvent(QMouseEvent *ev)
+{
+    //TODO:redturn
+    QPoint pos = ev->pos();
+    qDebug() << pos;
+    pos.setX(pos.x() - dis);
+    pos.setY(pos.y() - dis);
+    if(_selected_id == -1)//没有选择棋子
+    {
+        int id = findposid(pos);
+        if(id != -1 && ((_isredturn && stones[id]._isred) || (!_isredturn && !stones[id]._isred)))
+            _selected_id = id;
+    }
+    else//选择了棋子
+    {
+        int id = findposid(pos);
+        if(id != -1 && stones[id]._isred == stones[_selected_id]._isred)
+        {
+            if(id == _selected_id)//选择了棋子，但是是自己，则取消
+                _selected_id = -1;
+            else
+                _selected_id = id;//不是自己，是本方棋子，就换到那个棋子上去
+        }
+        else if(canmove(_selected_id, pos))//要走的位置上一定是对方的活棋子或者空地或者死棋子
+        {
+            if(id == -1 || stones[id]._isdead)
+                move(_selected_id, pos);
+            else
+                move(_selected_id, id);
+            _selected_id = -1;
+            _isredturn = !_isredturn;
+        }
+    }
+    if(stones[4]._isdead || stones[20]._isdead)
+    {
+        initstones(_isreddown);
+    }
+    update();
+}
+
+bool Board::canmove(int id, QPoint &pos)
+{
+    bool ret = false;
+    switch(stones[id]._name)
+    {
+    case JU:
+        ret = canmoveJU(id, pos);
+        break;
+    case MA:
+        ret = canmoveMA(id, pos);
+        break;
+    case PAO:
+        ret = canmovePAO(id, pos);
+        break;
+    case BING:
+        ret = canmoveBING(id, pos);
+        break;
+    case SHI:
+        ret = canmoveSHI(id, pos);
+        break;
+    case XIANG:
+        ret = canmoveXIANG(id, pos);
+        break;
+    case JIANG:
+        ret = canmoveJIANG(id, pos);
+        break;
+    }
+    return ret;
+}
+
+bool Board::canmoveJU(int id, QPoint &pos)
+{
+    int desx = (pos.x() + dis / 2) / dis;
+    int desy = (pos.y() + dis / 2) / dis;
+    int srcx = stones[id]._col;
+    int srcy = stones[id]._row;
+    if(desx < 0 || desy < 0 || desx > 8 || desy > 9)
+        return false;
+
+    if(desx == srcx)
+    {
+        int mini = std::min(desy, srcy);
+        int maxi = std::max(desy, srcy);
+        for(int i = mini + 1; i < maxi; i++)//不能有障碍物
+            if(findrowcolid(i, desx) != -1)
+                return false;
+        return true;
+    }
+    else if(desy == srcy)
+    {
+        int mini = std::min(desx, srcx);
+        int maxi = std::max(desx, srcx);
+        for(int i = mini + 1; i < maxi; i++)//不能有障碍物
+            if(findrowcolid(desy, i) != -1)
+                return false;
+        return true;
+    }
+    return false;
+}
+bool Board::canmoveMA(int id, QPoint &pos)
+{
+    int desx = (pos.x() + dis / 2) / dis;
+    int desy = (pos.y() + dis / 2) / dis;
+    int srcx = stones[id]._col;
+    int srcy = stones[id]._row;
+    if(desx < 0 || desy < 0 || desx > 8 || desy > 9)
+        return false;
+    const int step[8][2] = {{-1, -2}, {-2, -1}, {-2, 1}, {-1, 2}, {1, 2}, {2, 1}, {2, -1}, {1, -2}};
+    const int block[8][2] = {{0, -1}, {-1, 0}, {-1, 0}, {0, 1}, {0, 1}, {1, 0}, {1, 0}, {0, -1}};
+
+    for(int i = 0; i < 8; i++)
+    {
+        int probdesx = srcx + step[i][0];
+        int probdesy = srcy + step[i][1];
+        int blockx = srcx + block[i][0];
+        int blocky = srcy + block[i][1];
+        int id = findrowcolid(blocky, blockx);
+        if(probdesx == desx && probdesy == desy && (id == -1 || stones[id]._isdead))
+            return true;
+    }
+    return false;
+}
+bool Board::canmovePAO(int id, QPoint &pos)
+{
+    int desx = (pos.x() + dis / 2) / dis;
+    int desy = (pos.y() + dis / 2) / dis;
+    int srcx = stones[id]._col;
+    int srcy = stones[id]._row;
+    if(desx < 0 || desy < 0 || desx > 8 || desy > 9)
+        return false;
+    if(desx == srcx)
+    {
+        int mini = std::min(desy, srcy);
+        int maxi = std::max(desy, srcy);
+        int iblocks = 0;
+        int id = findrowcolid(desy, desx);
+        for(int i = mini + 1; i < maxi; i++)//不能有障碍物
+            if(findrowcolid(i, desx) != -1)
+                iblocks++;
+        if(iblocks == 0)
+        {
+            if(id == -1 || stones[id]._isdead)
+                return true;
+            else
+                return false;
+        }
+        else if(iblocks == 1)
+        {
+            if(id == -1 || stones[id]._isdead)
+                return false;
+            else
+                return true;
+        }
+        else
+            return false;
+    }
+    else if(desy == srcy)
+    {
+        int mini = std::min(desx, srcx);
+        int maxi = std::max(desx, srcx);
+        int iblocks = 0;
+        int id = findrowcolid(desy, desx);
+        for(int i = mini + 1; i < maxi; i++)//不能有障碍物
+            if(findrowcolid(desy, i) != -1)
+                iblocks++;
+        if(iblocks == 0)
+        {
+            if(id == -1 || stones[id]._isdead)
+                return true;
+            else
+                return false;
+        }
+        else if(iblocks == 1)
+        {
+            if(id == -1 || stones[id]._isdead)
+                return false;
+            else
+                return true;
+        }
+        else
+            return false;
+    }
+    return false;
+}
+bool Board::canmoveBING(int id, QPoint &pos)
+{
+    int desx = (pos.x() + dis / 2) / dis;
+    int desy = (pos.y() + dis / 2) / dis;
+    int srcx = stones[id]._col;
+    int srcy = stones[id]._row;
+    if(desx < 0 || desy < 0 || desx > 8 || desy > 9)
+        return false;
+    if(_isreddown)
+    {
+        if(stones[id]._isred)
+        {
+            if(srcy < 5)
+                return (desy == srcy && (desx == srcx - 1 || desx == srcx + 1)) || (desx == srcx && desy == srcy - 1);
+            else
+                return (desx == srcx && desy == srcy - 1);
+        }
+        else
+        {
+            if(srcy < 5)
+                return (desx == srcx && desy == srcy + 1);
+            else
+                return (desy == srcy && (desx == srcx - 1 || desx == srcx + 1)) || (desx == srcx && desy == srcy + 1);
+        }
+    }
+    else
+    {
+        if(stones[id]._isred)
+        {
+            if(srcy < 5)
+                return (desx == srcx && desy == srcy + 1);
+            else
+                return (desy == srcy && (desx == srcx - 1 || desx == srcx + 1)) || (desx == srcx && desy == srcy + 1);
+        }
+        else
+        {
+            if(srcy < 5)
+                return (desy == srcy && (desx == srcx - 1 || desx == srcx + 1)) || (desx == srcx && desy == srcy - 1);
+            else
+                return (desx == srcx && desy == srcy - 1);
+        }
+    }
+}
+bool Board::canmoveSHI(int id, QPoint &pos)
+{
+    int desx = (pos.x() + dis / 2) / dis;
+    int desy = (pos.y() + dis / 2) / dis;
+    int srcx = stones[id]._col;
+    int srcy = stones[id]._row;
+    if(desx < 3 || desx > 5)
+        return false;
+    if(_isreddown)
+    {
+        if(stones[id]._isred)
+        {
+            return desy >= 7 && desy <= 9 && std::abs(desx - srcx) == 1 && std::abs(desy - srcy) == 1;
+        }
+        else
+        {
+            return desy >= 0 && desy <= 2 && std::abs(desx - srcx) == 1 && std::abs(desy - srcy) == 1;
+        }
+    }
+    else
+    {
+        if(stones[id]._isred)
+        {
+            return desy >= 0 && desy <= 2 && std::abs(desx - srcx) == 1 && std::abs(desy - srcy) == 1;
+        }
+        else
+        {
+            return desy >= 7 && desy <= 9 && std::abs(desx - srcx) == 1 && std::abs(desy - srcy) == 1;
+        }
+    }
+}
+bool Board::canmoveXIANG(int id, QPoint &pos)
+{
+    int desx = (pos.x() + dis / 2) / dis;
+    int desy = (pos.y() + dis / 2) / dis;
+    int srcx = stones[id]._col;
+    int srcy = stones[id]._row;
+    if(desx < 0 || desx > 8 || desy < 0 || desy > 9)
+        return false;
+    if(_isreddown)
+    {
+        if(stones[id]._isred)
+        {
+            bool ret = desy >= 5 && std::abs(desx - srcx) == 2 && std::abs(desy - srcy) == 2;
+            if(ret)
+            {
+                int id = findrowcolid((desy + srcy) >> 1, (desx + srcx) >> 1);
+                ret &= (id == -1 || stones[id]._isdead);
+            }
+            return ret;
+        }
+        else
+        {
+            bool ret = desy < 5 && std::abs(desx - srcx) == 2 && std::abs(desy - srcy) == 2;
+            if(ret)
+            {
+                int id = findrowcolid((desy + srcy) >> 1, (desx + srcx) >> 1);
+                ret &= (id == -1 || stones[id]._isdead);
+            }
+            return ret;
+        }
+    }
+    else
+    {
+        if(stones[id]._isred)
+        {
+            bool ret = desy < 5 && std::abs(desx - srcx) == 2 && std::abs(desy - srcy) == 2;
+            if(ret)
+            {
+                int id = findrowcolid((desy + srcy) >> 1, (desx + srcx) >> 1);
+                ret &= (id == -1 || stones[id]._isdead);
+            }
+            return ret;
+        }
+        else
+        {
+            bool ret = desy >= 5 && std::abs(desx - srcx) == 2 && std::abs(desy - srcy) == 2;
+            if(ret)
+            {
+                int id = findrowcolid((desy + srcy) >> 1, (desx + srcx) >> 1);
+                ret &= (id == -1 || stones[id]._isdead);
+            }
+            return ret;
+        }
+    }
+}
+bool Board::canmoveJIANG(int id, QPoint &pos)
+{
+    int desx = (pos.x() + dis / 2) / dis;
+    int desy = (pos.y() + dis / 2) / dis;
+    int srcx = stones[id]._col;
+    int srcy = stones[id]._row;
+    if(desx < 3 || desx > 5)
+        return false;
+    bool ret = false;
+    if(_isreddown)
+    {
+        if(stones[id]._isred)
+        {
+            ret = (desy >= 7 && desy <= 9
+                    && ((desx == srcx && std::abs(srcy - desy) == 1) || (desy == srcy && std::abs(srcx - desx) == 1)));
+        }
+        else
+        {
+            ret = (desy >= 0 && desy <= 2
+                    && ((desx == srcx && std::abs(srcy - desy) == 1) || (desy == srcy && std::abs(srcx - desx) == 1)));
+        }
+    }
+    else
+    {
+        if(stones[id]._isred)
+        {
+            ret = (desy >= 0 && desy <= 2
+                    && ((desx == srcx && std::abs(srcy - desy) == 1) || (desy == srcy && std::abs(srcx - desx) == 1)));
+        }
+        else
+        {
+            ret = (desy >= 7 && desy <= 9
+                    && ((desx == srcx && std::abs(srcy - desy) == 1) || (desy == srcy && std::abs(srcx - desx) == 1)));
+        }
+    }
+    return ret;
+}
+
+void Board::move(int id, QPoint &p)
+{
+    int col = (p.x() + dis / 2) / dis;
+    int row = (p.y() + dis / 2) / dis;
+    stones[id]._col = col;
+    stones[id]._row = row;
+}
+
+//
+void Board::move(int id, int to)
+{
+    stones[id]._col = stones[to]._col;
+    stones[id]._row = stones[to]._row;
+    stones[to]._isdead = true;
+    stones[to]._row = -1;
+    stones[to]._col = -1;
+}
+int Board::findposid(QPoint &p)
+{
+    for(int i = 0; i < 32; i++)
+    {
+        if(clickinside(i, p) && !stones[i]._isdead)
+            return i;
+    }
+    return -1;
+}
+
+bool Board::clickinside(int id, QPoint &pos)
+{
+    return cell(id).contains(pos);
+}
+
+int Board::findrowcolid(int row, int col)
+{
+    for(int i = 0; i < 32; i++)
+    {
+        if(!stones[i]._isdead && stones[i]._col == col && stones[i]._row == row)
+        {
+            return i;
+        }
+    }
+    return -1;
 }
